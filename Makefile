@@ -10,7 +10,7 @@ mac:
 	GOOS=darwin GOARCH=amd64 go build -o out/xlsx-uppercaser-darwin
 
 linux:
-	GOOS=linux GOARCH=amd64 go build -o out/xlsx-uppercaser
+	GOOS=linux GOARCH=amd64 go build -o out/xlsx-uppercaser-linux
 
 PHONY:
 	.windows
