@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+	"bufio"
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"gopkg.in/urfave/cli.v1"
 	"log"
@@ -10,27 +12,48 @@ import (
 	"strings"
 )
 
-func saveFile(file *excelize.File, currentFile string, overwrite bool) {
-	var filename string
-	if overwrite {
-		filename = currentFile
-	} else {
-		filename = strings.TrimSuffix(currentFile, ".xlsx") + "-upper.xlsx"
-	}
-	file.SaveAs(filename)
+func replaceFile(originalFile string, upperFile string) {
+	err := os.Rename(upperFile, originalFile)
+	if err != nil {
+        log.Fatal(err)
+    }
 }
 
-func uppercaseFile(file string, overwrite bool) {
-	xlsx, err := excelize.OpenFile(file)
-	if err != nil {
-		log.Fatal("Not a valid excel file: %s", file)
-		return
-	}
+func upperFilename(currentFile string) string {
+	var outputFilename string
+	ext := filepath.Ext(currentFile)
+	outputFilename = strings.TrimSuffix(currentFile, ext) + "-upper" + ext
+	return outputFilename
+}
 
+func uppercaseFile(fileLoc string, upperFileLoc string) {
+	file, err := os.Open(fileLoc)
+
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer file.Close()
+
+	ofile, err := os.Create(upperFileLoc)
+	if err != nil {
+        log.Fatal(err)
+    }
+    defer ofile.Close()
+	w := bufio.NewWriter(ofile)
+
+    scanner := bufio.NewScanner(file)
+
+    for scanner.Scan() {
+		w.WriteString(strings.ToUpper(scanner.Text()+"\n"))
+    }
+	w.Flush()
+}
+
+func uppercaseXlsx(xlsx *excelize.File, upperFile string) {
 	// each sheet in spreadsheet
 	for i := 1; i <= xlsx.SheetCount; i++ {
 		sheetName := xlsx.GetSheetName(i)
-		log.Printf("Working on File:%s,Sheet:%s", file, sheetName)
+		log.Printf("Working on Sheet:%s", sheetName)
 
 		// each row in sheet
 		rows := xlsx.GetRows(sheetName)
@@ -47,12 +70,25 @@ func uppercaseFile(file string, overwrite bool) {
 			}
 		}
 	}
-	saveFile(xlsx, file, overwrite)
+	xlsx.SaveAs(upperFile)
 }
 
 func uppercase(args []string, overwrite bool) {
 	for _, currentFile := range args {
-		uppercaseFile(currentFile, overwrite)
+		u := upperFilename(currentFile)
+		//uppercaseCsv(currentFile, overwrite)
+		xlsx, err := excelize.OpenFile(currentFile)
+		if err != nil {
+			log.Printf("Not a valid excel file: %s\n", currentFile)
+			uppercaseFile(currentFile, u)
+		} else {
+			uppercaseXlsx(xlsx, u)
+		}
+
+		if overwrite {
+			replaceFile(currentFile, u)
+		}
+
 	}
 }
 
@@ -60,8 +96,8 @@ func main() {
 	var overwrite string
 
 	app := cli.NewApp()
-	app.Name = "xlsx-uppercaser"
-	app.Usage = "Given any number of excel files, make every cell uppercase. Don't ask why."
+	app.Name = "uppercaser"
+	app.Usage = "Given any number of files, make everything uppercase. Don't ask why."
 
 	flags := []cli.Flag{
 		cli.StringFlag{
